@@ -1,0 +1,58 @@
+# .github/workflows/read-fileversion.yml
+name: Read FileVersion on Push
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  get-file-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout source
+        uses: actions/checkout@v4
+
+      # Chỉnh đường dẫn file EXE/DLL ở đây ↓↓↓
+      - name: 🔧 Set EXE path
+        run: echo "EXE_PATH=bin/Release/net8.0/MyApp.exe" >> $GITHUB_ENV
+
+      - name: 🔍 Extract FileVersion
+        id: fileversion
+        run: |
+          FILE="$EXE_PATH"
+
+          echo "📌 File: $FILE"
+
+          if [ ! -f "$FILE" ]; then
+            echo "❌ File không tồn tại. Kiểm tra lại đường dẫn."
+            exit 1
+          fi
+
+          # Tìm các dòng chứa thông tin version
+          RAW=$(strings "$FILE" | grep -E "FileVersion|ProductVersion|AssemblyFileVersion" || true)
+
+          echo "🔎 Raw version lines:"
+          echo "$RAW"
+
+          # Lấy chuỗi dạng x.x.x.x từ raw data
+          VERSION=$(echo "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+
+          # Fallback quét toàn file
+          if [ -z "$VERSION" ]; then
+            VERSION=$(strings "$FILE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "❌ Không tìm được FileVersion."
+            exit 1
+          fi
+
+          echo "✅ Detected FileVersion: $VERSION"
+          echo "file_version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 📣 Log version
+        run: echo "FileVersion là: ${{ steps.fileversion.outputs.file_version }}"
