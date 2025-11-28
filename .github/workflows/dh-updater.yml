@@ -10,9 +10,9 @@ jobs:
 
     env:
       EXE_PATH: ./Dh.Updater.DebugConsole.exe
-      ZIP_DIR: ./ # thư mục cần đóng gói
-      ZIP_PATH: ./app-update.zip # tên file zip đầu ra
-      UPDATER_URLS: "" # sau này bạn cấu hình link release vào đây (phân tách bởi dấu phẩy)
+      ZIP_DIR: ./ # đóng gói cả repo (trừ exclude)
+      ZIP_PATH: ./app-update.zip
+      UPDATER_URLS: "" # sau này cấu hình link release
       EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**"
 
     steps:
