@@ -60,18 +60,18 @@ jobs:
           echo "json_path=$JSON_PATH" >> "$GITHUB_OUTPUT"
           echo "xml_path=$XML_PATH" >> "$GITHUB_OUTPUT"
 
-            # Release 1: ZIP + XML + JSON theo tag v<version> trên nhánh main
-      - name: Create GitHub Release (main)
+            # Release 1: CHỈ ZIP theo tag v<version> trên nhánh main
+      - name: Create GitHub Release (zip only)
         if: github.ref == 'refs/heads/main'
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.relvars.outputs.tag }}
+          tag_name: ${{ steps.relvars.outputs.tag }} # v<version>
           release_name: Dh Updater ${{ steps.relvars.outputs.version }}
           draft: false # public
-          prerelease: false # để được tính là "latest"
+          prerelease: false # release "chính thức"
           target_commitish: ${{ github.sha }}
 
       - name: Upload ZIP asset
@@ -83,26 +83,63 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.relvars.outputs.zip_path }}
           asset_name: ${{ steps.relvars.outputs.zip_name }}
-          asset_content_type: application/zip
+          asset_content_type:
+            application/zip
 
-      - name: Upload XML asset to main release
+            # Release 2: tag_release_xml với file XML mới nhất (xoá cũ, tạo lại)
+      - name: Update XML tagged release
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.relvars.outputs.xml_path }}
-          asset_name: Dh.Updater.DebugConsole.exe.dh.updater.xml
-          asset_content_type: application/xml
+        run: |
+          INFO='${{ steps.updater.outputs.info }}'
+          VERSION=$(echo "$INFO" | jq -r '.version')
+          XML_PATH=$(echo "$INFO" | jq -r '.xml_path')
 
-      - name: Upload JSON asset to main release
+          TAG_XML="tag_release_xml"
+          TITLE_XML="Dh Updater XML latest ($VERSION)"
+
+          echo "Updating release $TAG_XML with $XML_PATH"
+
+          # Xoá release cũ nếu có
+          gh release view "$TAG_XML" >/dev/null 2>&1 && gh release delete "$TAG_XML" -y || true
+          # Xoá tag cũ nếu có (trên remote)
+          git push origin ":refs/tags/$TAG_XML" || true
+
+          # Tạo release mới với tag cố định và file XML hiện tại
+          gh release create "$TAG_XML" "$XML_PATH" \
+            --title "$TITLE_XML" \
+            --notes "Latest dh.updater.xml for version $VERSION" \
+            --target "${GITHUB_SHA}" \
+            --draft=false \
+            --prerelease=false
+
+      # Release 3: tag_release_json với file JSON mới nhất (xoá cũ, tạo lại)
+      - name: Update JSON tagged release
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.relvars.outputs.json_path }}
-          asset_name: Dh.Updater.DebugConsole.exe.dh.updater.json
-          asset_content_type: application/json
+        run: |
+          INFO='${{ steps.updater.outputs.info }}'
+          VERSION=$(echo "$INFO" | jq -r '.version')
+          JSON_PATH=$(echo "$INFO" | jq -r '.json_path')
+
+          TAG_JSON="tag_release_json"
+          TITLE_JSON="Dh Updater JSON latest ($VERSION)"
+
+          echo "Updating release $TAG_JSON with $JSON_PATH"
+
+          gh release view "$TAG_JSON" >/dev/null 2>&1 && gh release delete "$TAG_JSON" -y || true
+          git push origin ":refs/tags/$TAG_JSON" || true
+
+          gh release create "$TAG_JSON" "$JSON_PATH" \
+            --title "$TITLE_JSON" \
+            --notes "Latest dh.updater.json for version $VERSION" \
+            --target "${GITHUB_SHA}" \
+            --draft=false \
+            --prerelease=false
+
+      - name: Show updater info
+        run: |
+          echo "Updater info JSON:"
+          echo '${{ steps.updater.outputs.info }}'
