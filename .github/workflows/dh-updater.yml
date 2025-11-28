@@ -16,7 +16,7 @@ jobs:
       ZIP_DIR: ./ # thư mục cần đóng gói
       ZIP_PATH: ./app-update.zip # tham số, script sẽ override tên theo version
       UPDATER_URLS: "" # nếu muốn thêm URL ngoài
-      EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**,.github/**,.github/*"
+      EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**,.github/**,.github/*,.git,.gitignore"
 
     steps:
       - name: Checkout source
