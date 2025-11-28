@@ -24,7 +24,6 @@ function parseExcludePatterns(raw) {
     .filter(Boolean);
 }
 
-// match đơn giản đủ dùng cho mấy pattern mình đang xài
 function isExcluded(relPath, patterns) {
   const p = relPath.replace(/\\/g, "/");
 
@@ -32,24 +31,22 @@ function isExcluded(relPath, patterns) {
     if (!pat) continue;
     const pattern = pat.replace(/\\/g, "/");
 
-    // thư mục: xxx/**  hoặc .git/**
+    // dir/**
     if (pattern.endsWith("/**")) {
-      const prefix = pattern.slice(0, -3); // bỏ /**
+      const prefix = pattern.slice(0, -3);
       if (p === prefix || p.startsWith(prefix + "/")) return true;
       continue;
     }
 
-    // file theo đuôi: *.pdb
+    // *.ext
     if (pattern.startsWith("*.")) {
-      const ext = pattern.slice(1); // ".pdb"
+      const ext = pattern.slice(1);
       if (p.endsWith(ext)) return true;
       continue;
     }
 
-    // khớp chính xác tên (ít dùng)
     if (p === pattern) return true;
   }
-
   return false;
 }
 
@@ -61,11 +58,10 @@ function walkFiles(rootDir, patterns, extraExcludes = []) {
       const full = path.join(dir, e.name);
       const rel = path.relative(rootDir, full).replace(/\\/g, "/");
 
-      // bỏ qua các file/thư mục thêm tay (vd: chính file zip)
       if (extraExcludes.includes(rel)) continue;
 
       if (e.isDirectory()) {
-        if (isExcluded(rel + "/dummy", patterns)) continue; // nếu pattern dạng dir/** trúng
+        if (isExcluded(rel + "/dummy", patterns)) continue;
         walk(full);
       } else if (e.isFile()) {
         if (isExcluded(rel, patterns)) continue;
@@ -101,7 +97,7 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Lấy version từ EXE
+  // 1. Version
   console.log("🔍 Đọc version từ:", absExePath);
   const { stdout: stringsOut } = await execFileAsync("strings", [absExePath]);
   const versionMatch = stringsOut.match(/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/);
@@ -112,26 +108,23 @@ async function main() {
   const version = versionMatch[0];
   console.log("✅ Version:", version);
 
-  // 2. Chuẩn bị exclude
+  // 2. Exclude
   const excludePatterns = parseExcludePatterns(process.env.EXCLUDE_PATTERNS || "");
   console.log("❗ EXCLUDE_PATTERNS:", excludePatterns.join(", ") || "(none)");
 
-  // tự exclude luôn file zip nếu nó nằm trong ZIP_DIR
   let relZipInDir = null;
   if (absZipPath.startsWith(absZipDir)) {
     relZipInDir = path.relative(absZipDir, absZipPath).replace(/\\/g, "/");
     console.log("❗ Tự exclude file zip khỏi chính nó:", relZipInDir);
   }
 
-  // 3. Tạo zip: chạy zip từ trong ZIP_DIR
+  // 3. Zip
   console.log("📦 Tạo zip:");
   console.log("  - CWD      :", absZipDir);
   console.log("  - Zip file :", absZipPath);
   const zipArgs = ["-r", absZipPath, "."];
-
   for (const pat of excludePatterns) {
     if (!pat) continue;
-    // pattern dùng trực tiếp, vì đang ở trong ZIP_DIR
     zipArgs.push("-x", pat);
   }
   if (relZipInDir) {
@@ -141,12 +134,12 @@ async function main() {
   await execFileAsync("zip", zipArgs, { cwd: absZipDir });
   console.log("✅ Đã tạo zip");
 
-  // 4. SHA512 (base64) của zip
+  // 4. SHA512
   const zipBuffer = fs.readFileSync(absZipPath);
   const sha512 = crypto.createHash("sha512").update(zipBuffer).digest("base64");
   console.log("🔐 SHA512 (base64) của zip:", sha512.substring(0, 32) + "...");
 
-  // 5. Tính MD5 cho các file (đã exclude) trong ZIP_DIR
+  // 5. MD5 files
   console.log("🧮 Tính MD5 cho các file (đã áp dụng exclude) trong:", absZipDir);
   const files = walkFiles(absZipDir, excludePatterns, relZipInDir ? [relZipInDir] : []);
   const fileMd5 = {};
@@ -156,12 +149,22 @@ async function main() {
     fileMd5[rel] = md5;
   }
 
-  // 6. Build metadata JSON/XML
-  const urls = urlsArg
+  // 6. URLs: release download URL + extra URLs
+  const repo = process.env.GITHUB_REPOSITORY || "";
+  const tag = "v" + version;
+  const zipName = path.basename(absZipPath);
+  const releaseUrl = repo ? `https://github.com/${repo}/releases/download/${tag}/${zipName}` : "";
+
+  const extraUrls = urlsArg
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const urls = [];
+  if (releaseUrl) urls.push(releaseUrl);
+  urls.push(...extraUrls);
+
+  // 7. JSON / XML
   const exeBaseName = path.basename(absExePath);
   const jsonPath = path.resolve(`${exeBaseName}.dh.updater.json`);
   const xmlPath = path.resolve(`${exeBaseName}.dh.updater.xml`);
@@ -203,12 +206,12 @@ async function main() {
   console.log("  - JSON:", jsonPath);
   console.log("  - XML :", xmlPath);
 
-  // 7. In JSON output cho GH Actions
   const output = {
     version,
     exe_path: absExePath,
     zip_dir: absZipDir,
     zip_path: absZipPath,
+    zip_name: zipName,
     json_path: jsonPath,
     xml_path: xmlPath,
     sha512,

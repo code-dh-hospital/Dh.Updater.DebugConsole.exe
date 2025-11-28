@@ -4,15 +4,18 @@ on:
   push:
     branches: [main, master, develop]
 
+permissions:
+  contents: write # để push branch & tạo release
+
 jobs:
   build-updater:
     runs-on: ubuntu-latest
 
     env:
       EXE_PATH: ./Dh.Updater.DebugConsole.exe
-      ZIP_DIR: ./ # đóng gói cả repo (trừ exclude)
-      ZIP_PATH: ./app-update.zip
-      UPDATER_URLS: "" # sau này cấu hình link release
+      ZIP_DIR: ./ # thư mục cần đóng gói
+      ZIP_PATH: ./app-update.zip # tên file zip đầu ra
+      UPDATER_URLS: "" # nếu muốn thêm URL ngoài
       EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**"
 
     steps:
@@ -24,6 +27,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
       - name: Run dh-updater script
         id: updater
         run: |
@@ -31,7 +39,97 @@ jobs:
           JSON_LINE=$(grep 'UPDATER_OUTPUT_JSON:' updater.log | sed 's/UPDATER_OUTPUT_JSON://')
           echo "info=$JSON_LINE" >> "$GITHUB_OUTPUT"
 
-      - name: Show parsed updater info
+      - name: Parse updater info
+        id: relvars
         run: |
-          echo "Updater info JSON:"
-          echo '${{ steps.updater.outputs.info }}'
+          INFO='${{ steps.updater.outputs.info }}'
+          echo "INFO: $INFO"
+
+          VERSION=$(echo "$INFO" | jq -r '.version')
+          ZIP_PATH=$(echo "$INFO" | jq -r '.zip_path')
+          ZIP_NAME=$(echo "$INFO" | jq -r '.zip_name')
+          JSON_PATH=$(echo "$INFO" | jq -r '.json_path')
+          XML_PATH=$(echo "$INFO" | jq -r '.xml_path')
+
+          TAG="v$VERSION"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "json_path=$JSON_PATH" >> "$GITHUB_OUTPUT"
+          echo "xml_path=$XML_PATH" >> "$GITHUB_OUTPUT"
+
+      # Release 1: ZIP trên nhánh main
+      - name: Create GitHub Release (zip)
+        if: github.ref == 'refs/heads/main'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.relvars.outputs.tag }}
+          release_name: Dh Updater ${{ steps.relvars.outputs.version }}
+          draft: false
+          prerelease: false
+          target_commitish: ${{ github.sha }}
+
+      - name: Upload ZIP asset
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.relvars.outputs.zip_path }}
+          asset_name: ${{ steps.relvars.outputs.zip_name }}
+          asset_content_type: application/zip
+
+      # # Branch release_xml với file dh.updater.xml
+      # - name: Update release_xml branch
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     INFO='${{ steps.updater.outputs.info }}'
+      #     VERSION=$(echo "$INFO" | jq -r '.version')
+      #     XML_PATH=$(echo "$INFO" | jq -r '.xml_path')
+
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      #     git fetch origin
+
+      #     git checkout release_xml 2>/dev/null || git checkout --orphan release_xml
+      #     git rm -rf . >/dev/null 2>&1 || true
+
+      #     cp "$XML_PATH" ./dh.updater.xml
+
+      #     git add dh.updater.xml
+      #     git commit -m "Update dh.updater.xml for version $VERSION" || echo "Nothing to commit"
+      #     git push origin release_xml --force
+
+      # # Branch release_json với file dh.updater.json
+      # - name: Update release_json branch
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     INFO='${{ steps.updater.outputs.info }}'
+      #     VERSION=$(echo "$INFO" | jq -r '.version')
+      #     JSON_PATH=$(echo "$INFO" | jq -r '.json_path')
+
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      #     git fetch origin
+
+      #     git checkout release_json 2>/dev/null || git checkout --orphan release_json
+      #     git rm -rf . >/dev/null 2>&1 || true
+
+      #     cp "$JSON_PATH" ./dh.updater.json
+
+      #     git add dh.updater.json
+      #     git commit -m "Update dh.updater.json for version $VERSION" || echo "Nothing to commit"
+      #     git push origin release_json --force
+
+      # - name: Show updater info
+      #   run: |
+      #     echo "Updater info JSON:"
+      #     echo '${{ steps.updater.outputs.info }}'
