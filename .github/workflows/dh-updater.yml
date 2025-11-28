@@ -82,7 +82,8 @@ jobs:
           TAG='${{ steps.relvars.outputs.tag }}'
           VERSION='${{ steps.relvars.outputs.version }}'
           ZIP_PATH='${{ steps.relvars.outputs.zip_path }}'
-          TITLE="Dh Updater $VERSION"
+          ZIP_NAME='${{ steps.relvars.outputs.zip_name }}'
+          TITLE="$ZIP_NAME"
 
           echo "📦 Publish release $TAG with asset: $ZIP_PATH"
 
@@ -111,9 +112,11 @@ jobs:
           VERSION='${{ steps.relvars.outputs.version }}'
           XML_PATH='${{ steps.relvars.outputs.xml_path }}'
           XML_NAME='${{ steps.relvars.outputs.xml_name }}'
+          ZIP_NAME='${{ steps.relvars.outputs.zip_name }}'
 
           TAG_XML="tag_release_xml"
-          TITLE_XML="Dh Updater XML latest ($VERSION)"
+
+          TITLE_XML="$ZIP_NAME"
 
           echo "📝 Updating $TAG_XML with $XML_PATH"
 
@@ -141,9 +144,10 @@ jobs:
           VERSION='${{ steps.relvars.outputs.version }}'
           JSON_PATH='${{ steps.relvars.outputs.json_path }}'
           JSON_NAME='${{ steps.relvars.outputs.json_name }}'
+          ZIP_NAME='${{ steps.relvars.outputs.zip_name }}'
 
           TAG_JSON="tag_release_json"
-          TITLE_JSON="Dh Updater JSON latest ($VERSION)"
+          TITLE_JSON="$ZIP_NAME"
 
           echo "🧾 Updating $TAG_JSON with $JSON_PATH"
 
