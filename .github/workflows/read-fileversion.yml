@@ -2,48 +2,19 @@ name: Read FileVersion on Push
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - develop
+    branches: [main, master, develop]
 
 jobs:
   get-file-version:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set EXE path
-        run: echo "EXE_PATH=./Dh.Updater.DebugConsole.exe" >> $GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Extract FileVersion
-        id: fileversion
+      - name: Extract FileVersion via Node script
         run: |
-          FILE="$EXE_PATH"
-          echo "📌 File: $FILE"
-
-          if [ ! -f "$FILE" ]; then
-            echo "❌ File không tồn tại: $FILE"
-            exit 1
-          fi
-
-          RAW=$(strings "$FILE" | grep -E "FileVersion|ProductVersion|AssemblyFileVersion" || true)
-
-          echo "🔎 Raw version lines:"
-          echo "$RAW"
-
-          VERSION=$(echo "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-
-          if [ -z "$VERSION" ]; then
-            VERSION=$(strings "$FILE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-          fi
-
-          if [ -z "$VERSION" ]; then
-            echo "❌ Không tìm được FileVersion."
-            exit 1
-          fi
-
-          echo "✅ Detected FileVersion: $VERSION"
-          echo "file_version=$VERSION" >> "$GITHUB_OUTPUT"
+          node .github/workflows/extract-version.js ./Dh.Updater.DebugConsole.exe
