@@ -1,0 +1,37 @@
+name: Build Dh Updater Package
+
+on:
+  push:
+    branches: [main, master, develop]
+
+jobs:
+  build-updater:
+    runs-on: ubuntu-latest
+
+    env:
+      EXE_PATH: ./Dh.Updater.DebugConsole.exe
+      ZIP_DIR: ./publish # thư mục cần đóng gói
+      ZIP_PATH: ./app-update.zip # tên file zip đầu ra
+      UPDATER_URLS: "" # sau này bạn cấu hình link release vào đây (phân tách bởi dấu phẩy)
+      EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run dh-updater script
+        id: updater
+        run: |
+          node scripts/dh-updater.js "$EXE_PATH" "$ZIP_DIR" "$ZIP_PATH" "$UPDATER_URLS" | tee updater.log
+          JSON_LINE=$(grep 'UPDATER_OUTPUT_JSON:' updater.log | sed 's/UPDATER_OUTPUT_JSON://')
+          echo "info=$JSON_LINE" >> "$GITHUB_OUTPUT"
+
+      - name: Show parsed updater info
+        run: |
+          echo "Updater info JSON:"
+          echo '${{ steps.updater.outputs.info }}'

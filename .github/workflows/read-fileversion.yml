@@ -1,8 +1,7 @@
 name: Read FileVersion on Push
 
 on:
-  push:
-    branches: [main, master, develop]
+  workflow_dispatch:
 
 jobs:
   get-file-version:
@@ -13,7 +12,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Extract FileVersion via Node script
         run: |
