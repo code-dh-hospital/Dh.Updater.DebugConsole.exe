@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set EXE path
-        run: echo "EXE_PATH=bin/Release/net8.0/MyApp.exe" >> $GITHUB_ENV
+        run: echo "EXE_PATH=./Dh.Updater.DebugConsole.exe" >> $GITHUB_ENV
 
       - name: Extract FileVersion
         id: fileversion
