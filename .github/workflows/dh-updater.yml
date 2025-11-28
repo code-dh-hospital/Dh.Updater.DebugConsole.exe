@@ -16,7 +16,7 @@ jobs:
       ZIP_DIR: ./ # thư mục cần đóng gói
       ZIP_PATH: ./app-update.zip # tên file zip đầu ra
       UPDATER_URLS: "" # nếu muốn thêm URL ngoài
-      EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**"
+      EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**,.github/**"
 
     steps:
       - name: Checkout source
@@ -60,7 +60,7 @@ jobs:
           echo "json_path=$JSON_PATH" >> "$GITHUB_OUTPUT"
           echo "xml_path=$XML_PATH" >> "$GITHUB_OUTPUT"
 
-      # Release 1: ZIP trên nhánh main
+            # Release 1: ZIP theo tag v<version> trên nhánh main
       - name: Create GitHub Release (zip)
         if: github.ref == 'refs/heads/main'
         id: create_release
@@ -85,51 +85,53 @@ jobs:
           asset_name: ${{ steps.relvars.outputs.zip_name }}
           asset_content_type: application/zip
 
-      # # Branch release_xml với file dh.updater.xml
-      # - name: Update release_xml branch
-      #   if: github.ref == 'refs/heads/main'
-      #   run: |
-      #     INFO='${{ steps.updater.outputs.info }}'
-      #     VERSION=$(echo "$INFO" | jq -r '.version')
-      #     XML_PATH=$(echo "$INFO" | jq -r '.xml_path')
+      # Release 2: tag_release_xml với file XML mới nhất
+      - name: Update XML tagged release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          INFO='${{ steps.updater.outputs.info }}'
+          VERSION=$(echo "$INFO" | jq -r '.version')
+          XML_PATH=$(echo "$INFO" | jq -r '.xml_path')
 
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG_XML="tag_release_xml"
+          TITLE_XML="Dh Updater XML latest ($VERSION)"
 
-      #     git fetch origin
+          echo "Updating release $TAG_XML with $XML_PATH"
 
-      #     git checkout release_xml 2>/dev/null || git checkout --orphan release_xml
-      #     git rm -rf . >/dev/null 2>&1 || true
+          # Xoá release cũ (nếu có), bỏ qua lỗi nếu chưa tồn tại
+          gh release delete "$TAG_XML" -y || true
 
-      #     cp "$XML_PATH" ./dh.updater.xml
+          # Tạo release mới với tag cố định, file XML mới nhất
+          gh release create "$TAG_XML" "$XML_PATH" \
+            --title "$TITLE_XML" \
+            --notes "Latest dh.updater.xml for version $VERSION" \
+            --target "${GITHUB_SHA}"
 
-      #     git add dh.updater.xml
-      #     git commit -m "Update dh.updater.xml for version $VERSION" || echo "Nothing to commit"
-      #     git push origin release_xml --force
+      # Release 3: tag_release_json với file JSON mới nhất
+      - name: Update JSON tagged release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          INFO='${{ steps.updater.outputs.info }}'
+          VERSION=$(echo "$INFO" | jq -r '.version')
+          JSON_PATH=$(echo "$INFO" | jq -r '.json_path')
 
-      # # Branch release_json với file dh.updater.json
-      # - name: Update release_json branch
-      #   if: github.ref == 'refs/heads/main'
-      #   run: |
-      #     INFO='${{ steps.updater.outputs.info }}'
-      #     VERSION=$(echo "$INFO" | jq -r '.version')
-      #     JSON_PATH=$(echo "$INFO" | jq -r '.json_path')
+          TAG_JSON="tag_release_json"
+          TITLE_JSON="Dh Updater JSON latest ($VERSION)"
 
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Updating release $TAG_JSON with $JSON_PATH"
 
-      #     git fetch origin
+          gh release delete "$TAG_JSON" -y || true
 
-      #     git checkout release_json 2>/dev/null || git checkout --orphan release_json
-      #     git rm -rf . >/dev/null 2>&1 || true
+          gh release create "$TAG_JSON" "$JSON_PATH" \
+            --title "$TITLE_JSON" \
+            --notes "Latest dh.updater.json for version $VERSION" \
+            --target "${GITHUB_SHA}"
 
-      #     cp "$JSON_PATH" ./dh.updater.json
-
-      #     git add dh.updater.json
-      #     git commit -m "Update dh.updater.json for version $VERSION" || echo "Nothing to commit"
-      #     git push origin release_json --force
-
-      # - name: Show updater info
-      #   run: |
-      #     echo "Updater info JSON:"
-      #     echo '${{ steps.updater.outputs.info }}'
+      - name: Show updater info
+        run: |
+          echo "Updater info JSON:"
+          echo '${{ steps.updater.outputs.info }}'
