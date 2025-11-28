@@ -86,7 +86,7 @@ async function main() {
 
   const absExePath = path.resolve(exePath);
   const absZipDir = path.resolve(zipDir);
-  const absZipPath = path.resolve(zipPath);
+  let absZipPath = path.resolve(zipPath);
 
   if (!fs.existsSync(absExePath)) {
     console.error("❌ EXE không tồn tại:", absExePath);
@@ -108,6 +108,7 @@ async function main() {
   const version = versionMatch[0];
   console.log("✅ Version:", version);
 
+  absZipPath = path.resolve(`${path.basename(absExePath)}.v${version}.zip`);
   // 2. Exclude
   const excludePatterns = parseExcludePatterns(process.env.EXCLUDE_PATTERNS || "");
   console.log("❗ EXCLUDE_PATTERNS:", excludePatterns.join(", ") || "(none)");
