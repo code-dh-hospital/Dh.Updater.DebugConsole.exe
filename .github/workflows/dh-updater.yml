@@ -10,7 +10,7 @@ jobs:
 
     env:
       EXE_PATH: ./Dh.Updater.DebugConsole.exe
-      ZIP_DIR: ./publish # thư mục cần đóng gói
+      ZIP_DIR: ./ # thư mục cần đóng gói
       ZIP_PATH: ./app-update.zip # tên file zip đầu ra
       UPDATER_URLS: "" # sau này bạn cấu hình link release vào đây (phân tách bởi dấu phẩy)
       EXCLUDE_PATTERNS: "obj/**,bin/Debug/**,*.pdb,.git/**,node_modules/**"
@@ -27,7 +27,7 @@ jobs:
       - name: Run dh-updater script
         id: updater
         run: |
-          node scripts/dh-updater.js "$EXE_PATH" "$ZIP_DIR" "$ZIP_PATH" "$UPDATER_URLS" | tee updater.log
+          node .github/workflows/dh-updater.js "$EXE_PATH" "$ZIP_DIR" "$ZIP_PATH" "$UPDATER_URLS" | tee updater.log
           JSON_LINE=$(grep 'UPDATER_OUTPUT_JSON:' updater.log | sed 's/UPDATER_OUTPUT_JSON://')
           echo "info=$JSON_LINE" >> "$GITHUB_OUTPUT"
 
